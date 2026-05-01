@@ -30,12 +30,7 @@ cp /tmp/cd/tooling/*.py discovery/tooling/
 cp /tmp/cd/tooling/config.example.json discovery/tooling/config.json
 ```
 
-Then edit `discovery/tooling/config.json`:
-
-- `interviewer_name` — your first name (or shortest unambiguous prefix that matches every spelling Gemini gives you).
-- `drive_folders` — one or more Drive folder IDs and scopes. To find a folder ID, open it in Drive and copy the `folders/<ID>` portion of the URL.
-
-The other knobs (pivot patterns, classifier keywords) ship with sensible defaults; see [SKILL.md](./SKILL.md#first-time-setup) §First-time setup for tuning notes.
+Now run `/customer-discovery` in Claude Code. On first invocation the skill notices the unconfigured state, asks you for your first name and a Drive folder URL, and writes the real config for you. **You won't need to touch any JSON.** Once setup wraps, it kicks off the harvest.
 
 ## Usage
 
@@ -83,9 +78,11 @@ If you have the [Anthropic Cowork `schedule` skill](https://github.com/anthropic
 
 ## Tuning to your voice
 
-The defaults are calibrated to one specific interviewer's verbal tics ("let me share what I've heard from other CPOs", "I'm gonna switch to a demo", etc). The skill will catch the obvious cases for most users out-of-the-box, but you'll get cleaner pivot cuts after ~10 minutes of editing `pivot.patterns` in `config.json` to match your actual phrasings.
+The defaults are calibrated to one specific interviewer's verbal tics ("let me share what I've heard from other CPOs", "I'm gonna switch to a demo", etc). They'll catch the obvious cases out-of-the-box, but you'll get cleaner pivot cuts after a few runs.
 
-Run on 5-10 of your own historical calls, eyeball where the cut lands in `unbiased raw transcripts/`, and iterate. Each pattern is a Python regex — see [SKILL.md](./SKILL.md#speaker-pivot-detection) §Speaker-pivot detection for the rules (preamble guards, high-confidence patterns, etc).
+If you notice the pivot cutting too early or too late on your calls, just tell the skill: "the pivot is cutting too early on my Brad calls" or "it's missing my demo opener phrasing". The skill will adjust `pivot.patterns` and rewrite the config for you — no regex editing required.
+
+Same for the classifier ("it's labelling internal syncs as discovery — tighten up").
 
 ## License
 

@@ -23,9 +23,9 @@ def _strip_help_keys(obj):
 def load() -> dict:
     if not CONFIG_PATH.exists():
         sys.stderr.write(
-            f"ERROR: {CONFIG_PATH} not found.\n"
-            "Copy config.example.json (or see SKILL.md §First-time setup) "
-            "and edit it with your Drive folder IDs and your name.\n"
+            f"ERROR: config not initialised ({CONFIG_PATH} missing).\n"
+            "Run /customer-discovery in Claude Code — the skill will ask you for your "
+            "name + Drive folder and write the config for you.\n"
         )
         sys.exit(2)
     raw = json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
@@ -43,6 +43,12 @@ def _validate(cfg: dict) -> None:
     if not cfg["interviewer_name"].strip():
         sys.stderr.write("ERROR: config.json interviewer_name must be non-empty.\n")
         sys.exit(2)
+    if cfg["interviewer_name"] == "YourName":
+        sys.stderr.write(
+            "ERROR: config not initialised (interviewer_name is still the placeholder 'YourName').\n"
+            "Run /customer-discovery in Claude Code — the skill will finish setup for you.\n"
+        )
+        sys.exit(2)
     if not cfg["drive_folders"]:
         sys.stderr.write("ERROR: config.json drive_folders must be a non-empty list.\n")
         sys.exit(2)
@@ -53,5 +59,11 @@ def _validate(cfg: dict) -> None:
         if f["scope"] not in ("primary", "secondary"):
             sys.stderr.write(
                 f"ERROR: drive_folders[{f.get('name','?')}] scope must be 'primary' or 'secondary' (got {f['scope']!r}).\n"
+            )
+            sys.exit(2)
+        if f["id"].startswith("REPLACE-") or not f["id"].strip():
+            sys.stderr.write(
+                f"ERROR: config not initialised (drive_folders[{f.get('name','?')}].id is still a placeholder).\n"
+                "Run /customer-discovery in Claude Code — the skill will finish setup for you.\n"
             )
             sys.exit(2)

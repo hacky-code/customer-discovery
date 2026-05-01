@@ -20,59 +20,71 @@ When the skill is invoked, look at the user's input after `/customer-discovery`:
 
 Both modes operate on the corpus stored under `<output_dir>/` (default `discovery/`).
 
+## First-run check (do this BEFORE running either mode)
+
+On every invocation, verify the skill is configured. The checks are fast (file reads only). **The user must never be told to edit `config.json` themselves — gather what's needed in conversation and write the file with the `Write` tool.** If any check fails, do NOT run the workflow — drive the conversation instead.
+
+1. **`config.json` exists.** Look for `<repo>/discovery/tooling/config.json` (or wherever the user installed the tooling). If missing, this is a first run; tell the user "Looks like this is your first run — I'll ask you a few quick questions and set everything up. Takes about 2 minutes." Then run conversational setup (below).
+
+2. **`config.json` has real values, not placeholders.** Read the file and check:
+   - `interviewer_name` is not `"YourName"` and not empty.
+   - No `drive_folders[].id` starts with `REPLACE-` (or is empty).
+   If any field is still a placeholder, tell the user which pieces are missing and run conversational setup for ONLY those fields.
+
+3. **(update mode only) Google Drive MCP is connected.** Confirm the tool `mcp__Google-Drive__read_file_content` is available (it'll be in your tool list if the MCP server is connected). If not, tell the user: "I don't see a Google Drive MCP connector — this is the one piece I can't set up for you. Open Claude Code, run `/mcp`, connect Google Drive via OAuth, then re-invoke `/customer-discovery update`." Stop.
+
+4. **(query mode only) The corpus has at least one transcript.** Check that `<output_dir>/full raw transcripts/` exists and is non-empty. If empty, tell the user "Your corpus is empty — run `/customer-discovery update` first to harvest transcripts." Stop.
+
+If all checks pass, proceed to the requested mode's workflow.
+
+### Conversational setup (the agent runs this — user never edits files)
+
+Gather information by asking the user, then write `config.json` yourself. Never instruct the user to "edit the file" — you do the writing.
+
+1. **interviewer_name** — ask: "What's your first name as it appears in your Gemini transcripts? (Use the shortest unambiguous prefix — e.g. 'Sam' if Gemini sometimes writes 'Sam' and sometimes 'Sam Smith'.)" Suggest a default by reading `git config user.name | awk '{print $1}'` if a git config exists in the repo.
+
+2. **drive_folders** — ask: "Open your customer-discovery folder in Google Drive. Paste the URL — I'll pull the folder ID from it. Is this a *dedicated discovery folder* (every file is a candidate call) or a *mixed folder* (e.g. all Meet recordings — I'll need to filter by date)?" Extract the ID from the pasted URL with the regex `folders/([A-Za-z0-9_-]+)`. After the first folder, ask "Want to add another?" — most users have one primary + one secondary. Stop whenever they're done.
+
+3. **(optional) Classifier audience** — only ask if you suspect the user's audience isn't the product-leader default: "By default I filter for product-leader discovery calls. If you mostly interview a different audience (founders, engineers, designers, etc.), tell me and I'll adjust the keyword list." If they answer, swap `classifier.strong_keywords` accordingly. Otherwise skip — defaults are fine for most.
+
+4. **Write the config** — read `tooling/config.example.json` to get the full structure, substitute the answered fields into a new dict, and write `tooling/config.json` via the `Write` tool. Preserve every `_*_help` key from the template so the file stays self-documenting.
+
+5. **Confirm**: "Setup done — wrote your config to `tooling/config.json`. Ready to run `/customer-discovery update` to harvest your first batch?"
+
+If the user gets stuck or wants to skip, offer: "I can fill in defaults for everything except your name and at least one Drive folder ID — those two I genuinely need from you."
+
 ## Credentials
 
 The harvest mode (`update`) calls `mcp__Google-Drive__read_file_content` to fetch your meeting notes. **Your Google OAuth credential lives entirely inside the Drive MCP server's own config — this skill never sees it, and there are no API keys or tokens stored in this repo.** The query mode is read-only against local transcript files; no credentials involved.
 
 ## First-time setup
 
-Five steps. Do these once before invoking `update`. Query mode works as soon as the corpus has at least one transcript in it.
+Two prereqs you do once. The skill handles everything else conversationally on first invocation — no JSON editing, no manual config.
 
 ### 1. Connect the Google Drive MCP server
 
-If you don't already have the Drive MCP installed: see `https://docs.claude.com/en/docs/claude-code/mcp` for the Claude Code MCP setup flow, then connect Google Drive via OAuth.
+This is the one piece the skill can't automate for you (OAuth has to flow through Claude Code's MCP layer). See `https://docs.claude.com/en/docs/claude-code/mcp` for the Claude Code MCP setup, then connect Google Drive via OAuth.
 
-Verify with `/mcp` in Claude Code — you should see a `Google-Drive` (or similarly named) connector listed.
+Verify with `/mcp` — you should see a `Google-Drive` (or similarly named) connector listed.
 
-### 2. Set up your Drive folders
+### 2. Have at least one Drive folder ready
 
-The skill reads from one or more Drive folders. Two folder *scopes* are supported:
+Decide where your meeting notes live in Drive. Two folder scopes:
 
-- **`primary`** — a dedicated folder where every file is a candidate transcript (e.g. you have a "Customer Discovery" folder you drop calls into). Full listing every run; deduped against your local LOG.
-- **`secondary`** — a mixed folder (e.g. all Google Meet recordings) where you filter by `createdTime > <last run>` to avoid scanning history.
+- **`primary`** — a dedicated folder where every file is a candidate transcript (e.g. a "Customer Discovery" folder you drop calls into). Full listing every run; deduped against your local LOG.
+- **`secondary`** — a mixed folder (e.g. all Google Meet recordings) where the skill filters by `createdTime > <last run>` to avoid scanning history.
 
-You need at least one folder. To find a folder ID: open it in Drive, copy the `folders/<ID>` portion of the URL.
+Most users end up with one of each. You'll just paste the folder URL into the chat when the skill asks.
 
-### 3. Edit `config.json`
+### Done — now run `/customer-discovery`
 
-Open `<repo>/discovery/tooling/config.json` and update at minimum:
+On first invocation the skill detects the unconfigured state, asks you for your name + folder URLs, optionally asks about your interview audience, and writes `discovery/tooling/config.json` for you. Then it kicks off the harvest.
 
-- `interviewer_name` — your first name (or the shortest unambiguous prefix that matches every spelling Gemini gives you in transcripts).
-- `drive_folders` — your folder IDs and scopes.
-- `output_dir` — where transcripts and `LOG.md` should be written. Default `discovery` (relative to repo root).
+Once you have transcripts, you can also ask questions: `/customer-discovery what pain points have CPOs mentioned around competitive intel?`
 
-The file has inline `_*_help` keys explaining every option; the loader strips them before use.
+### Tuning (optional, post-setup)
 
-### 4. (Optional) Tune pivot patterns to your verbal style
-
-The pivot detector matches phrases YOU use when you transition from asking discovery questions to pitching your own idea ("let me share what I've heard from other CPOs", "I'm going to switch to a demo", etc).
-
-Defaults are calibrated to one user. They'll catch the obvious cases for most people, but you'll get cleaner cuts if you spend ~10 minutes editing `pivot.patterns` in `config.json` to match your actual phrasings. Run the skill on 5-10 of your historical calls, see where the cut lands, and adjust.
-
-`pivot.high_confidence_patterns` are phrases that NEVER occur benignly mid-discovery (e.g. demo openers — "let me show you the product I built"). They bypass the standard intro-skip budget so a follow-up call where you demo within 5 minutes still gets cleanly cut.
-
-`pivot.negative_preambles` invalidates a pivot hit if the same sentence earlier contains a "telegraph" phrase ("one last question and I'll switch to insights" → still a discovery question, not a pivot).
-
-### 5. (Optional) Tune the classifier
-
-The classifier filters out non-discovery calls from your secondary folders (status updates, investor chats, internal syncs). A call passes if at least one `strong_keyword` AND one `supporting_keyword` appear in the first 8k chars.
-
-- Defaults are tuned for product-leader discovery. Re-tune for your audience (founders, eng leaders, designers, marketers, etc).
-- Set `classifier.enabled: false` to skip filtering entirely — every transcript with a discoverable speaker structure gets processed.
-
-### Done
-
-Run `/customer-discovery update` to harvest your first batch. Once you have transcripts, you can also start asking questions: `/customer-discovery what pain points have CPOs mentioned around competitive intel?`
+If the pivot detector or classifier feels off after a few runs, just ask the skill to retune — e.g. "the pivot is cutting too early on my Brad calls" or "it's classifying internal syncs as discovery". The skill will adjust `pivot.patterns` or `classifier.strong_keywords` for you and rewrite the config. You don't need to know the regex syntax.
 
 ---
 
