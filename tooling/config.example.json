@@ -1,0 +1,107 @@
+{
+  "_comment": "customer-discovery skill config. Copy this file to config.json and edit it to point at YOUR Drive folders and YOUR name. Folder IDs are not secrets (without OAuth nobody can read the folders) but you may want to gitignore config.json if your repo is public. The Google OAuth credential lives in the Google Drive MCP server's own config — NOT here.",
+
+  "interviewer_name": "YourName",
+  "_interviewer_name_help": "Your name as it appears in Gemini-generated transcripts. Substring-matched case-insensitively against speaker labels to identify YOUR turns. If transcripts spell your name multiple ways (e.g. 'Sam' / 'Sam Smith'), use the shortest unambiguous prefix.",
+
+  "drive_folders": [
+    {
+      "name": "Customer Discovery",
+      "id": "REPLACE-WITH-YOUR-PRIMARY-FOLDER-ID",
+      "scope": "primary"
+    },
+    {
+      "name": "Meet Recordings",
+      "id": "REPLACE-WITH-YOUR-SECONDARY-FOLDER-ID",
+      "scope": "secondary"
+    }
+  ],
+  "_drive_folders_help": "scope=primary: a dedicated folder where every file is a candidate transcript — full listing every run, dedupe against LOG.md. scope=secondary: a mixed folder (e.g. all Meet recordings) where you filter by createdTime > last run to avoid scanning history. Add as many folders as you want. Find a folder ID by opening it in Drive and copying the 'folders/<ID>' portion of the URL.",
+
+  "first_run_lookback_days": 90,
+  "_first_run_lookback_days_help": "On first run (no LOG.md yet), how far back to scan secondary folders. Primary folders always do a full listing. Set lower if your Meet history is huge.",
+
+  "output_dir": "discovery",
+  "_output_dir_help": "Root for LOG.md and the three transcript subfolders ('full raw transcripts', 'unbiased raw transcripts', 'feedback raw transcripts'). Path is relative to repo root.",
+
+  "pivot": {
+    "min_seconds": 600,
+    "high_confidence_min_seconds": 300,
+    "high_confidence_min_interviewer_turns": 5,
+
+    "patterns": [
+      "i've been (?:talking|speaking|chatting) (?:to|with) (?:a (?:bunch|ton|lot) of|many|around|about|\\d+)",
+      "(?:i've|we've) (?:talked|spoken|chatted) (?:to|with) (?:a (?:bunch|ton|lot) of|many|around|about|\\d+)",
+      "(?:happy to )?share (?:what|some of what) (?:i've|we've) (?:learned|been hearing|heard|seen)",
+      "(?:let me|wanted to) share (?:some|a few|what)",
+      "(?:let me|wanted to) (?:walk you|tell you) (?:through|about) (?:what|the)",
+      "(?:some of )?the (?:patterns|themes|things) (?:i've|we've) (?:been )?(?:seeing|seen|hearing|heard)",
+      "(?:based on|from) (?:what|the conversations) (?:i've|we've) (?:had|been having|heard)",
+      "what (?:i'm|we're) building",
+      "the (?:idea|hypothesis|thesis|thing) (?:i'm|we're) (?:exploring|chasing|testing)",
+      "(?:so )?here's (?:what|the) (?:i'm|we're) (?:seeing|hearing|thinking)",
+      "(?:if i|let me) (?:had to )?summariz",
+      "(?:number one|#1|first) which has come up",
+      "(?:a )?(?:one|couple (?:of )?|few|some) (?:themes?|patterns?|things?) (?:that )?(?:have emerged|has emerged|i've heard|i've seen|i've noticed|we've heard|we've seen|i'm hearing|we're hearing)",
+      "(?:themes?|patterns?) (?:i've|we've) (?:heard|seen|noticed)(?: from)?(?: other)?",
+      "(?:from|heard from) (?:my )?other (?:product leaders?|cpos?|conversations?|calls?|people|folks|pms?)",
+      "(?:get|hear|have) your (?:perspective|feedback|advice|thoughts) on (?:a )?(?:couple of |few |some )?(?:themes?|patterns?|things?)",
+      "(?:quick |brief )?summariz(?:e|ing) (?:what|some of what|the key|the main)",
+      "let me (?:give you |share )(?:a |the )?(?:quick |brief )?(?:summary|tl;?dr|overview|recap)",
+      "(?:i'll|let me|i want to|i wanted to|let's|i'm going to|i'm gonna|gonna) (?:actually |just |now )?switch to [^\\n]{0,25}?(?:i've heard|insights|themes|patterns)",
+      "(?:i'll|let me|i'm going to|i'm gonna) share[,.]?(?: you know)?(?: like)? what i've heard",
+      "(?:i'll|i will) (?:call out|share) what i've heard",
+      "what i'll do is (?:i'll |let me )?(?:switch|share|tell|walk|give)",
+      "(?:what|things) i've heard from(?: a)?(?: (?:couple|few|bunch|lot) of)?(?: some)?(?: other)?",
+      "(?:from|heard from)(?: my)?(?: a (?:couple|few|bunch|lot) of)?(?: some)? other (?:product leaders?|cpos?|pms?|pm leaders?|conversations?|calls?|people|folks)",
+      "insights (?:that )?i've (?:had|heard|gathered|been hearing) from",
+      "conversations (?:that i've had )?with (?:other|many|a few|several|multiple|my other)",
+      "themes (?:that )?have emerged",
+      "(?:25|30|20|15|10|\\d+) (?:odd )?(?:discovery )?conversations with"
+    ],
+
+    "high_confidence_patterns": [
+      "(?:i'll|let me|i want to|i wanted to|let's|i'm going to|i'm gonna|gonna) switch to (?:a |the )?demo",
+      "(?:i'll|let me|i'm going to|i'm gonna) (?:show|walk) you (?:a |the )?(?:quick |brief )?demo",
+      "(?:i'll|let me|i'm going to|i'm gonna) (?:show|walk) you (?:the |a |my )?(?:product|prototype|tool|app|thing) (?:that )?(?:i|we) (?:built|made|created|am building|'?ve built|'?ve been building)"
+    ],
+
+    "negative_preambles": [
+      "\\b(?:one|two|three|a couple(?: of)?|couple more|few|a few|another|last|final|one more|two more|few more|couple more) (?:last |final |more )?questions?\\b",
+      "\\bone (?:last|final|more) (?:thing|question)\\b",
+      "\\bmaybe (?:one|two|a couple|a few)\\b"
+    ],
+
+    "_patterns_help": "Pivot detector regex (case-insensitive, applied to YOUR turns only). 'patterns' fires after min_seconds. 'high_confidence_patterns' fires after high_confidence_min_seconds — use only for phrases that NEVER occur benignly mid-discovery (e.g. demo openers). 'negative_preambles' invalidates a pivot hit if the same SENTENCE earlier contains one of these phrases (telegraphing — 'one last question and I'll switch to insights' followed by an actual discovery question). Tune these to YOUR verbal style; the defaults are calibrated to one user."
+  },
+
+  "classifier": {
+    "enabled": true,
+    "strong_keywords": [
+      "product leader",
+      "head of product",
+      "chief product",
+      "cpo",
+      "cpto",
+      "vp of product",
+      "vp product",
+      "product leadership",
+      "pm team",
+      "product management",
+      "product team"
+    ],
+    "supporting_keywords": [
+      "discovery",
+      "challenges",
+      "startup",
+      "building",
+      "feedback",
+      "idea",
+      "customer",
+      "signals",
+      "insights",
+      "b2b"
+    ],
+    "_classifier_help": "Filters out non-discovery calls (status updates, investor chats, etc) from secondary folders. A call passes if at least one strong_keyword AND one supporting_keyword appear in the first 8k chars (or the full doc when there's no Transcript header). Set enabled=false to process every transcript regardless. Defaults are tuned for product-leader discovery — re-tune for your audience (founders, eng leaders, designers, marketers, etc)."
+  }
+}
